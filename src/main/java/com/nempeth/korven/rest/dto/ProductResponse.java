@@ -1,5 +1,6 @@
 package com.nempeth.korven.rest.dto;
 
+import com.nempeth.korven.constants.StockUnit;
 import lombok.Builder;
 
 import java.math.BigDecimal;
@@ -12,5 +13,8 @@ public record ProductResponse(
         String description,
         BigDecimal price,
         BigDecimal cost,
-        CategoryResponse category
-) {}
+        CategoryResponse category,
+        BigDecimal stockQuantity,
+        StockUnit stockUnit,
+        BigDecimal reorderPoint) {
+}

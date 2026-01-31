@@ -1,5 +1,6 @@
 package com.nempeth.korven.persistence.entity;
 
+import com.nempeth.korven.constants.StockUnit;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,13 +21,11 @@ public class Product {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "business_id", nullable = false,
-                foreignKey = @ForeignKey(name = "fk_products_business"))
+    @JoinColumn(name = "business_id", nullable = false, foreignKey = @ForeignKey(name = "fk_products_business"))
     private Business business;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "category_id", nullable = false,
-                foreignKey = @ForeignKey(name = "fk_products_category"))
+    @JoinColumn(name = "category_id", nullable = false, foreignKey = @ForeignKey(name = "fk_products_category"))
     private Category category;
 
     @Column(name = "name", nullable = false, columnDefinition = "text")
@@ -41,11 +40,22 @@ public class Product {
     @Column(name = "cost", nullable = false, precision = 12, scale = 2)
     private BigDecimal cost;
 
-    @OneToMany(mappedBy = "product", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    @Column(name = "stock_quantity", precision = 12, scale = 2)
+    private BigDecimal stockQuantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stock_unit", length = 50)
+    private StockUnit stockUnit;
+
+    @Column(name = "reorder_point", precision = 12, scale = 2)
+    private BigDecimal reorderPoint;
+
+    @OneToMany(mappedBy = "product", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.LAZY)
     private Set<SaleItem> saleItems;
 
     @PrePersist
     public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
+        if (id == null)
+            id = UUID.randomUUID();
     }
 }
