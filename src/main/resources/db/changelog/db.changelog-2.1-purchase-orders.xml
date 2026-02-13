@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <changeSet id="009-create-purchase-order-tables" author="korven">
+        <!-- Purchase Order table -->
+        <createTable tableName="purchase_orders">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="business_id" type="uuid">
+                <constraints nullable="false" 
+                           foreignKeyName="fk_purchase_order_business"
+                           referencedTableName="business" 
+                           referencedColumnNames="id"
+                           deleteCascade="true"/>
+            </column>
+            <column name="supplier_name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamptz" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="received_at" type="timestamptz">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+
+        <!-- Purchase Order Item table -->
+        <createTable tableName="purchase_order_items">
+            <column name="id" type="uuid" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="purchase_order_id" type="uuid">
+                <constraints nullable="false"
+                           foreignKeyName="fk_purchase_order_item_order"
+                           referencedTableName="purchase_orders"
+                           referencedColumnNames="id"
+                           deleteCascade="true"/>
+            </column>
+            <column name="product_id" type="uuid">
+                <constraints nullable="false"
+                           foreignKeyName="fk_purchase_order_item_product"
+                           referencedTableName="products"
+                           referencedColumnNames="id"/>
+            </column>
+            <column name="product_name" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="numeric(12,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="unit_cost" type="numeric(12,2)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Add indexes for better query performance -->
+        <createIndex tableName="purchase_orders" indexName="idx_po_business_id">
+            <column name="business_id"/>
+        </createIndex>
+        <createIndex tableName="purchase_orders" indexName="idx_po_status">
+            <column name="status"/>
+        </createIndex>
+        <createIndex tableName="purchase_order_items" indexName="idx_poi_purchase_order_id">
+            <column name="purchase_order_id"/>
+        </createIndex>
+        <createIndex tableName="purchase_order_items" indexName="idx_poi_product_id">
+            <column name="product_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
