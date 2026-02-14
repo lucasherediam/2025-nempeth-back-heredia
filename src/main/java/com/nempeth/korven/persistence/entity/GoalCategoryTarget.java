@@ -25,7 +25,6 @@ public class GoalCategoryTarget {
                 foreignKey = @ForeignKey(name = "fk_gct_goal"))
     private Goal goal;
 
-    // No FK constraint - allows category deletion while preserving historical data
     @Column(name = "category_id", nullable = false)
     private UUID categoryId;
 
