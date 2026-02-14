@@ -14,6 +14,7 @@ import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.CategoryResponse;
 import com.nempeth.korven.rest.dto.ProductResponse;
 import com.nempeth.korven.rest.dto.ProductUpsertRequest;
+import com.nempeth.korven.rest.dto.UpdateStockRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,13 +35,13 @@ public class ProductService {
     @Transactional
     public UUID create(String userEmail, UUID businessId, ProductUpsertRequest req) {
         validateUserBusinessAccess(userEmail, businessId);
-        
+
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
-        
+
         Category category = categoryRepository.findById(req.categoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada"));
-        
+
         if (!category.getBusiness().getId().equals(businessId)) {
             throw new IllegalArgumentException("La categoría no pertenece a este negocio");
         }
@@ -56,8 +57,11 @@ public class ProductService {
                 .description(req.description())
                 .price(req.price())
                 .cost(req.cost())
+                .stockQuantity(req.stockQuantity())
+                .stockUnit(req.stockUnit())
+                .reorderPoint(req.reorderPoint())
                 .build();
-        
+
         product = productRepository.save(product);
         return product.getId();
     }
@@ -65,7 +69,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> listByBusiness(String userEmail, UUID businessId) {
         validateUserBusinessAccess(userEmail, businessId);
-        
+
         return productRepository.findByBusinessId(businessId).stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -74,7 +78,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> listByBusinessAndCategory(String userEmail, UUID businessId, UUID categoryId) {
         validateUserBusinessAccess(userEmail, businessId);
-        
+
         return productRepository.findByBusinessIdAndCategoryId(businessId, categoryId).stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -83,43 +87,60 @@ public class ProductService {
     @Transactional
     public void update(String userEmail, UUID businessId, UUID productId, ProductUpsertRequest req) {
         validateUserBusinessAccess(userEmail, businessId);
-        
+
         Product product = productRepository.findByIdAndBusinessId(productId, businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
-        
+
         Category category = categoryRepository.findById(req.categoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada"));
-        
+
         if (!category.getBusiness().getId().equals(businessId)) {
             throw new IllegalArgumentException("La categoría no pertenece a este negocio");
         }
-        
+
         product.setName(req.name());
         product.setDescription(req.description());
         product.setPrice(req.price());
         product.setCost(req.cost());
         product.setCategory(category);
-        
+        product.setStockQuantity(req.stockQuantity());
+        product.setStockUnit(req.stockUnit());
+        product.setReorderPoint(req.reorderPoint());
+
+        productRepository.save(product);
+    }
+
+    @Transactional
+    public void updateStock(String userEmail, UUID businessId, UUID productId, UpdateStockRequest req) {
+        validateUserBusinessAccess(userEmail, businessId);
+
+        Product product = productRepository.findByIdAndBusinessId(productId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
+
+        product.setStockQuantity(req.stockQuantity());
+        product.setStockUnit(req.unit());
+        product.setReorderPoint(req.reorderPoint());
+
         productRepository.save(product);
     }
 
     @Transactional
     public void delete(String userEmail, UUID businessId, UUID productId) {
         validateUserBusinessAccess(userEmail, businessId);
-        
+
         Product product = productRepository.findByIdAndBusinessId(productId, businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
-        
+
         productRepository.delete(product);
     }
 
     private void validateUserBusinessAccess(String userEmail, UUID businessId) {
         User user = userRepository.findByEmailIgnoreCase(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-        
+
         BusinessMembership membership = membershipRepository.findByBusinessIdAndUserId(businessId, user.getId())
                 .orElseThrow(() -> new IllegalArgumentException("No tienes acceso a este negocio"));
-        
+
         if (membership.getStatus() != MembershipStatus.ACTIVE) {
             throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
         }
@@ -133,7 +154,7 @@ public class ProductService {
                 .displayName(product.getCategory().getDisplayName())
                 .icon(product.getCategory().getIcon())
                 .build();
-        
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -141,6 +162,9 @@ public class ProductService {
                 .price(product.getPrice())
                 .cost(product.getCost())
                 .category(categoryResponse)
+                .stockQuantity(product.getStockQuantity())
+                .stockUnit(product.getStockUnit())
+                .reorderPoint(product.getReorderPoint())
                 .build();
     }
 }

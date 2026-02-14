@@ -2,6 +2,7 @@ package com.nempeth.korven.rest;
 
 import com.nempeth.korven.rest.dto.ProductResponse;
 import com.nempeth.korven.rest.dto.ProductUpsertRequest;
+import com.nempeth.korven.rest.dto.UpdateStockRequest;
 import com.nempeth.korven.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +23,8 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<?> create(@PathVariable UUID businessId,
-                                   @Valid @RequestBody ProductUpsertRequest req,
-                                   Authentication auth) {
+            @Valid @RequestBody ProductUpsertRequest req,
+            Authentication auth) {
         String userEmail = auth.getName();
         UUID productId = productService.create(userEmail, businessId, req);
         return ResponseEntity.ok(Map.of("productId", productId.toString()));
@@ -31,34 +32,44 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> list(@PathVariable UUID businessId,
-                                                     @RequestParam(required = false) UUID categoryId,
-                                                     Authentication auth) {
+            @RequestParam(required = false) UUID categoryId,
+            Authentication auth) {
         String userEmail = auth.getName();
         List<ProductResponse> products;
-        
+
         if (categoryId != null) {
             products = productService.listByBusinessAndCategory(userEmail, businessId, categoryId);
         } else {
             products = productService.listByBusiness(userEmail, businessId);
         }
-        
+
         return ResponseEntity.ok(products);
     }
 
     @PutMapping("/{productId}")
     public ResponseEntity<?> update(@PathVariable UUID businessId,
-                                   @PathVariable UUID productId,
-                                   @Valid @RequestBody ProductUpsertRequest req,
-                                   Authentication auth) {
+            @PathVariable UUID productId,
+            @Valid @RequestBody ProductUpsertRequest req,
+            Authentication auth) {
         String userEmail = auth.getName();
         productService.update(userEmail, businessId, productId, req);
         return ResponseEntity.ok(Map.of("message", "Producto actualizado"));
     }
 
+    @PatchMapping("/{productId}/stock")
+    public ResponseEntity<?> updateStock(@PathVariable UUID businessId,
+            @PathVariable UUID productId,
+            @Valid @RequestBody UpdateStockRequest req,
+            Authentication auth) {
+        String userEmail = auth.getName();
+        productService.updateStock(userEmail, businessId, productId, req);
+        return ResponseEntity.ok(Map.of("message", "Stock actualizado"));
+    }
+
     @DeleteMapping("/{productId}")
     public ResponseEntity<?> delete(@PathVariable UUID businessId,
-                                   @PathVariable UUID productId,
-                                   Authentication auth) {
+            @PathVariable UUID productId,
+            Authentication auth) {
         String userEmail = auth.getName();
         productService.delete(userEmail, businessId, productId);
         return ResponseEntity.ok(Map.of("message", "Producto eliminado"));
