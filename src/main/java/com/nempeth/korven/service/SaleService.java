@@ -25,7 +25,7 @@ public class SaleService {
     private final UserRepository userRepository;
 
     @Transactional
-    public UUID createSale(String userEmail, UUID businessId) {
+    public UUID createSale(String userEmail, UUID businessId, String note) {
         User user = validateUserBusinessAccess(userEmail, businessId);
         
         Business business = businessRepository.findById(businessId)
@@ -37,11 +37,18 @@ public class SaleService {
             userName = user.getEmail();
         }
 
+        // Calcular número de orden cíclico (1-999)
+        int nextOrderNumber = saleRepository.findMaxOrderNumberByBusinessId(businessId)
+                .map(max -> max >= 999 ? 1 : max + 1)
+                .orElse(1);
+
         // Crear la venta vacía
         Sale sale = Sale.builder()
                 .business(business)
                 .createdByUser(user)
                 .createdByUserName(userName)
+                .orderNumber(nextOrderNumber)
+                .note(note)
                 .occurredAt(null)
                 .totalAmount(BigDecimal.ZERO)
                 .build();
@@ -141,6 +148,37 @@ public class SaleService {
         saleRepository.save(sale);
     }
 
+    @Transactional
+    public void deleteSale(String userEmail, UUID businessId, UUID saleId) {
+        validateUserBusinessAccess(userEmail, businessId);
+
+        Sale sale = saleRepository.findById(saleId)
+                .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
+
+        if (!sale.getBusiness().getId().equals(businessId)) {
+            throw new IllegalArgumentException("La venta no pertenece a este negocio");
+        }
+
+        saleRepository.delete(sale);
+    }
+
+    @Transactional
+    public SaleResponse updateSale(String userEmail, UUID businessId, UUID saleId, String note) {
+        validateUserBusinessAccess(userEmail, businessId);
+
+        Sale sale = saleRepository.findById(saleId)
+                .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
+
+        if (!sale.getBusiness().getId().equals(businessId)) {
+            throw new IllegalArgumentException("La venta no pertenece a este negocio");
+        }
+
+        sale.setNote(note);
+        saleRepository.save(sale);
+
+        return mapToResponse(sale);
+    }
+
     private User validateUserBusinessAccess(String userEmail, UUID businessId) {
         User user = userRepository.findByEmailIgnoreCase(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
@@ -189,6 +227,8 @@ public class SaleService {
 
         return SaleResponse.builder()
                 .id(sale.getId())
+                .orderNumber(sale.getOrderNumber())
+                .note(sale.getNote())
                 .occurredAt(sale.getOccurredAt())
                 .totalAmount(sale.getTotalAmount())
                 .createdByUserName(createdByUserName)

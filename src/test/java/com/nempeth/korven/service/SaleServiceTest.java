@@ -118,10 +118,11 @@ class SaleServiceTest {
                 .totalAmount(BigDecimal.ZERO)
                 .build();
         
+        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.empty());
         when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
         
         // When
-        UUID saleId = saleService.createSale(userEmail, businessId);
+        UUID saleId = saleService.createSale(userEmail, businessId, null);
         
         // Then
         assertThat(saleId).isNotNull().isEqualTo(savedSale.getId());
@@ -161,10 +162,11 @@ class SaleServiceTest {
                 .totalAmount(BigDecimal.ZERO)
                 .build();
         
+        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.empty());
         when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
         
         // When
-        UUID saleId = saleService.createSale(userEmail, businessId);
+        UUID saleId = saleService.createSale(userEmail, businessId, null);
         
         // Then
         assertThat(saleId).isNotNull();

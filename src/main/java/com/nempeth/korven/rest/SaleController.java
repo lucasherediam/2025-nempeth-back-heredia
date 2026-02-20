@@ -2,6 +2,7 @@ package com.nempeth.korven.rest;
 
 import com.nempeth.korven.rest.dto.CreateSaleRequest;
 import com.nempeth.korven.rest.dto.SaleResponse;
+import com.nempeth.korven.rest.dto.UpdateSaleRequest;
 import com.nempeth.korven.service.SaleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +25,11 @@ public class SaleController {
 
     @PostMapping
     public ResponseEntity<?> createSale(@PathVariable UUID businessId,
+                                       @RequestBody(required = false) CreateSaleRequest request,
                                        Authentication auth) {
         String userEmail = auth.getName();
-        UUID saleId = saleService.createSale(userEmail, businessId);
+        String note = request != null ? request.note() : null;
+        UUID saleId = saleService.createSale(userEmail, businessId, note);
         
         return ResponseEntity.ok(Map.of(
                 "message", "Venta creada exitosamente",
@@ -66,6 +69,28 @@ public class SaleController {
         
         return ResponseEntity.ok(Map.of(
                 "message", "Venta cerrada exitosamente"
+        ));
+    }
+
+    @PutMapping("/{saleId}")
+    public ResponseEntity<SaleResponse> updateSale(@PathVariable UUID businessId,
+                                                   @PathVariable UUID saleId,
+                                                   @RequestBody UpdateSaleRequest request,
+                                                   Authentication auth) {
+        String userEmail = auth.getName();
+        SaleResponse updated = saleService.updateSale(userEmail, businessId, saleId, request.note());
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{saleId}")
+    public ResponseEntity<?> deleteSale(@PathVariable UUID businessId,
+                                        @PathVariable UUID saleId,
+                                        Authentication auth) {
+        String userEmail = auth.getName();
+        saleService.deleteSale(userEmail, businessId, saleId);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Venta eliminada exitosamente"
         ));
     }
 

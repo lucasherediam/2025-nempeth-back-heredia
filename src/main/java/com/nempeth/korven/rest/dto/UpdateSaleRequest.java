@@ -1,6 +1,6 @@
 package com.nempeth.korven.rest.dto;
 
-public record CreateSaleRequest(
+public record UpdateSaleRequest(
         String note
 ) {
 }
