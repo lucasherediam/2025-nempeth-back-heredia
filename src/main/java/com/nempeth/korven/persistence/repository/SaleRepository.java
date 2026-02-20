@@ -2,6 +2,7 @@ package com.nempeth.korven.persistence.repository;
 
 import com.nempeth.korven.persistence.entity.Sale;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +14,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SaleRepository extends JpaRepository<Sale, UUID> {
+    @Modifying
+    @Query("UPDATE Sale s SET s.createdByUser = null WHERE s.createdByUser.id = :userId")
+    void nullifyCreatedByUser(@Param("userId") UUID userId);
+
     List<Sale> findByBusinessIdOrderByOccurredAtDesc(UUID businessId);
     
     List<Sale> findByBusinessIdAndOccurredAtBetweenOrderByOccurredAtDesc(

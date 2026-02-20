@@ -6,6 +6,8 @@ import com.nempeth.korven.persistence.entity.Business;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
 import com.nempeth.korven.persistence.entity.User;
 import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
+import com.nempeth.korven.persistence.repository.PasswordResetTokenRepository;
+import com.nempeth.korven.persistence.repository.SaleRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.UpdateMembershipRoleRequest;
 import com.nempeth.korven.rest.dto.UpdateMembershipStatusRequest;
@@ -40,6 +42,12 @@ class UserServiceTest {
 
     @Mock
     private BusinessMembershipRepository membershipRepository;
+
+    @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Mock
+    private SaleRepository saleRepository;
 
     @InjectMocks
     private UserService userService;
@@ -350,11 +358,29 @@ class UserServiceTest {
     @DisplayName("Should delete user successfully")
     void shouldDeleteUserSuccessfully() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        doNothing().when(passwordResetTokenRepository).deleteByUserId(userId);
         doNothing().when(userRepository).delete(testUser);
 
         userService.deleteUser(userId, "test@example.com");
 
+        verify(passwordResetTokenRepository).deleteByUserId(userId);
+        verify(saleRepository).nullifyCreatedByUser(userId);
         verify(userRepository).delete(testUser);
+    }
+
+    @Test
+    @DisplayName("Should delete password reset tokens before deleting user")
+    void shouldDeletePasswordResetTokensBeforeDeletingUser() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        doNothing().when(passwordResetTokenRepository).deleteByUserId(userId);
+        doNothing().when(userRepository).delete(testUser);
+
+        userService.deleteUser(userId, "test@example.com");
+
+        var inOrder = inOrder(passwordResetTokenRepository, saleRepository, userRepository);
+        inOrder.verify(passwordResetTokenRepository).deleteByUserId(userId);
+        inOrder.verify(saleRepository).nullifyCreatedByUser(userId);
+        inOrder.verify(userRepository).delete(testUser);
     }
 
     @Test

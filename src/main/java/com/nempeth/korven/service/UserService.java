@@ -5,6 +5,8 @@ import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
 import com.nempeth.korven.persistence.entity.User;
 import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
+import com.nempeth.korven.persistence.repository.PasswordResetTokenRepository;
+import com.nempeth.korven.persistence.repository.SaleRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.BusinessMembershipResponse;
 import com.nempeth.korven.rest.dto.UpdateMembershipRoleRequest;
@@ -28,6 +30,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BusinessMembershipRepository membershipRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final SaleRepository saleRepository;
 
     private static final Pattern EMAIL_RX =
             Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
@@ -95,6 +99,8 @@ public class UserService {
         if (!target.getEmail().equalsIgnoreCase(requesterEmail)) {
             throw new AccessDeniedException("No autorizado para borrar este usuario");
         }
+        passwordResetTokenRepository.deleteByUserId(userId);
+        saleRepository.nullifyCreatedByUser(userId);
         userRepository.delete(target);
     }
 
