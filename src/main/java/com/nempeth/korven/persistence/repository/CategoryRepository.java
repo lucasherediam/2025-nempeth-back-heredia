@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
     List<Category> findByBusinessId(UUID businessId);
+
+    void deleteByBusinessId(UUID businessId);
     
     List<Category> findByBusinessIdAndType(UUID businessId, CategoryType type);
     

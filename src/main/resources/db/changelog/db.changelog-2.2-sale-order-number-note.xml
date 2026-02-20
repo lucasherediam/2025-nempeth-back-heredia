@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <changeSet id="014-sale-order-number-and-note" author="korven">
+        <!-- Número de orden cíclico (1-999) por negocio -->
+        <addColumn tableName="sale">
+            <column name="order_number" type="integer">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <!-- Nota libre opcional (ej: "Mesa 5", "Para llevar") -->
+        <addColumn tableName="sale">
+            <column name="note" type="text">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

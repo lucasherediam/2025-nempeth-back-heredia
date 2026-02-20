@@ -15,6 +15,8 @@ import java.util.UUID;
 public interface GoalRepository extends JpaRepository<Goal, UUID> {
     
     List<Goal> findByBusinessIdOrderByPeriodStartDesc(UUID businessId);
+
+    void deleteByBusinessId(UUID businessId);
     
     Optional<Goal> findByIdAndBusinessId(UUID id, UUID businessId);
     

@@ -1,5 +1,6 @@
 package com.nempeth.korven.persistence.repository;
 
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,4 +21,8 @@ public interface BusinessMembershipRepository extends JpaRepository<BusinessMemb
     List<BusinessMembership> findByBusinessId(UUID businessId);
     
     boolean existsByBusinessIdAndUserId(UUID businessId, UUID userId);
+
+    long countByBusinessIdAndRoleAndStatus(UUID businessId, MembershipRole role, MembershipStatus status);
+
+    void deleteByBusinessId(UUID businessId);
 }

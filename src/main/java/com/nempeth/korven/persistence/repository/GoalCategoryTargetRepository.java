@@ -28,4 +28,8 @@ public interface GoalCategoryTargetRepository extends JpaRepository<GoalCategory
     @Modifying
     @Query("UPDATE GoalCategoryTarget gct SET gct.categoryName = :newName WHERE gct.categoryId = :categoryId")
     int updateCategoryNameByCategoryId(@Param("categoryId") UUID categoryId, @Param("newName") String newName);
+
+    @Modifying
+    @Query("DELETE FROM GoalCategoryTarget gct WHERE gct.goal.id IN (SELECT g.id FROM Goal g WHERE g.business.id = :businessId)")
+    void deleteByBusinessId(@Param("businessId") UUID businessId);
 }

@@ -6,6 +6,16 @@ import com.nempeth.korven.persistence.entity.Business;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
 import com.nempeth.korven.persistence.entity.User;
 import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
+import com.nempeth.korven.persistence.repository.BusinessRepository;
+import com.nempeth.korven.persistence.repository.CategoryRepository;
+import com.nempeth.korven.persistence.repository.GoalCategoryTargetRepository;
+import com.nempeth.korven.persistence.repository.GoalRepository;
+import com.nempeth.korven.persistence.repository.PasswordResetTokenRepository;
+import com.nempeth.korven.persistence.repository.ProductRepository;
+import com.nempeth.korven.persistence.repository.PurchaseOrderItemRepository;
+import com.nempeth.korven.persistence.repository.PurchaseOrderRepository;
+import com.nempeth.korven.persistence.repository.SaleItemRepository;
+import com.nempeth.korven.persistence.repository.SaleRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.UpdateMembershipRoleRequest;
 import com.nempeth.korven.rest.dto.UpdateMembershipStatusRequest;
@@ -40,6 +50,36 @@ class UserServiceTest {
 
     @Mock
     private BusinessMembershipRepository membershipRepository;
+
+    @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Mock
+    private SaleRepository saleRepository;
+
+    @Mock
+    private SaleItemRepository saleItemRepository;
+
+    @Mock
+    private BusinessRepository businessRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private GoalCategoryTargetRepository goalCategoryTargetRepository;
+
+    @Mock
+    private GoalRepository goalRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private PurchaseOrderItemRepository purchaseOrderItemRepository;
+
+    @Mock
+    private PurchaseOrderRepository purchaseOrderRepository;
 
     @InjectMocks
     private UserService userService;
@@ -347,13 +387,99 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Should delete user successfully")
+    @DisplayName("Should delete user successfully when not an owner")
     void shouldDeleteUserSuccessfully() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByUserIdAndStatus(userId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of());
+        doNothing().when(passwordResetTokenRepository).deleteByUserId(userId);
         doNothing().when(userRepository).delete(testUser);
 
         userService.deleteUser(userId, "test@example.com");
 
+        verify(passwordResetTokenRepository).deleteByUserId(userId);
+        verify(saleRepository).nullifyCreatedByUser(userId);
+        verify(userRepository).delete(testUser);
+    }
+
+    @Test
+    @DisplayName("Should delete business and employees when sole owner deletes account")
+    void shouldDeleteBusinessAndEmployeesWhenSoleOwnerDeletes() {
+        // Setup: owner con un empleado
+        UUID employeeUserId = UUID.randomUUID();
+        User employeeUser = User.builder()
+                .id(employeeUserId)
+                .email("employee@example.com")
+                .name("Employee")
+                .lastName("User")
+                .passwordHash("hash")
+                .build();
+
+        BusinessMembership employeeMembership = BusinessMembership.builder()
+                .id(UUID.randomUUID())
+                .business(testBusiness)
+                .user(employeeUser)
+                .role(MembershipRole.EMPLOYEE)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+
+        // Mock: el usuario es OWNER activo
+        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByUserIdAndStatus(userId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of(testMembership));
+        when(membershipRepository.countByBusinessIdAndRoleAndStatus(
+                businessId, MembershipRole.OWNER, MembershipStatus.ACTIVE))
+                .thenReturn(1L); // único OWNER
+
+        // Mock: miembros del negocio (owner + empleado)
+        when(membershipRepository.findByBusinessId(businessId))
+                .thenReturn(List.of(testMembership, employeeMembership));
+
+        userService.deleteUser(userId, "test@example.com");
+
+        // Verificar limpieza de empleado
+        verify(passwordResetTokenRepository).deleteByUserId(employeeUserId);
+        verify(saleRepository).nullifyCreatedByUser(employeeUserId);
+
+        // Verificar borrado de datos del negocio
+        verify(saleItemRepository).deleteByBusinessId(businessId);
+        verify(saleRepository).deleteByBusinessId(businessId);
+        verify(purchaseOrderItemRepository).deleteByBusinessId(businessId);
+        verify(purchaseOrderRepository).deleteByBusinessId(businessId);
+        verify(goalCategoryTargetRepository).deleteByBusinessId(businessId);
+        verify(goalRepository).deleteByBusinessId(businessId);
+        verify(productRepository).deleteByBusinessId(businessId);
+        verify(categoryRepository).deleteByBusinessId(businessId);
+        verify(membershipRepository).deleteByBusinessId(businessId);
+
+        // Verificar borrado de empleado y negocio
+        verify(userRepository).delete(employeeUser);
+        verify(businessRepository).deleteById(businessId);
+
+        // Verificar borrado del owner
+        verify(passwordResetTokenRepository).deleteByUserId(userId);
+        verify(saleRepository).nullifyCreatedByUser(userId);
+        verify(userRepository).delete(testUser);
+    }
+
+    @Test
+    @DisplayName("Should not delete business when multiple owners exist")
+    void shouldNotDeleteBusinessWhenMultipleOwnersExist() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByUserIdAndStatus(userId, MembershipStatus.ACTIVE))
+                .thenReturn(List.of(testMembership));
+        when(membershipRepository.countByBusinessIdAndRoleAndStatus(
+                businessId, MembershipRole.OWNER, MembershipStatus.ACTIVE))
+                .thenReturn(2L); // hay otro OWNER
+
+        userService.deleteUser(userId, "test@example.com");
+
+        // No se debe borrar el negocio
+        verify(businessRepository, never()).deleteById(any());
+        verify(saleItemRepository, never()).deleteByBusinessId(any());
+
+        // Pero el owner sí se borra
+        verify(passwordResetTokenRepository).deleteByUserId(userId);
         verify(userRepository).delete(testUser);
     }
 
