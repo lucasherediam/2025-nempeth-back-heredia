@@ -19,6 +19,8 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
     void nullifyCreatedByUser(@Param("userId") UUID userId);
 
     List<Sale> findByBusinessIdOrderByOccurredAtDesc(UUID businessId);
+
+    void deleteByBusinessId(UUID businessId);
     
     List<Sale> findByBusinessIdAndOccurredAtBetweenOrderByOccurredAtDesc(
         UUID businessId, 

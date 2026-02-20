@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, UUID> {
     List<PurchaseOrder> findByBusinessId(UUID businessId);
 
+    void deleteByBusinessId(UUID businessId);
+
     List<PurchaseOrder> findByBusinessIdAndStatus(UUID businessId, PurchaseOrderStatus status);
 
     Optional<PurchaseOrder> findByIdAndBusinessId(UUID id, UUID businessId);

@@ -5,7 +5,15 @@ import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
 import com.nempeth.korven.persistence.entity.User;
 import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
+import com.nempeth.korven.persistence.repository.BusinessRepository;
+import com.nempeth.korven.persistence.repository.CategoryRepository;
+import com.nempeth.korven.persistence.repository.GoalCategoryTargetRepository;
+import com.nempeth.korven.persistence.repository.GoalRepository;
 import com.nempeth.korven.persistence.repository.PasswordResetTokenRepository;
+import com.nempeth.korven.persistence.repository.ProductRepository;
+import com.nempeth.korven.persistence.repository.PurchaseOrderItemRepository;
+import com.nempeth.korven.persistence.repository.PurchaseOrderRepository;
+import com.nempeth.korven.persistence.repository.SaleItemRepository;
 import com.nempeth.korven.persistence.repository.SaleRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.BusinessMembershipResponse;
@@ -32,6 +40,14 @@ public class UserService {
     private final BusinessMembershipRepository membershipRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final SaleRepository saleRepository;
+    private final SaleItemRepository saleItemRepository;
+    private final BusinessRepository businessRepository;
+    private final CategoryRepository categoryRepository;
+    private final GoalCategoryTargetRepository goalCategoryTargetRepository;
+    private final GoalRepository goalRepository;
+    private final ProductRepository productRepository;
+    private final PurchaseOrderItemRepository purchaseOrderItemRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
 
     private static final Pattern EMAIL_RX =
             Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
@@ -99,9 +115,65 @@ public class UserService {
         if (!target.getEmail().equalsIgnoreCase(requesterEmail)) {
             throw new AccessDeniedException("No autorizado para borrar este usuario");
         }
+
+        // Buscar negocios donde el usuario es único OWNER activo
+        List<BusinessMembership> ownerships = membershipRepository
+                .findByUserIdAndStatus(userId, MembershipStatus.ACTIVE)
+                .stream()
+                .filter(m -> m.getRole() == MembershipRole.OWNER)
+                .toList();
+
+        for (BusinessMembership ownership : ownerships) {
+            UUID businessId = ownership.getBusiness().getId();
+            long ownerCount = membershipRepository.countByBusinessIdAndRoleAndStatus(
+                    businessId, MembershipRole.OWNER, MembershipStatus.ACTIVE);
+
+            if (ownerCount <= 1) {
+                // Es el único OWNER: borrar todo el negocio y sus empleados
+                deleteBusinessAndMembers(businessId, userId);
+            }
+        }
+
+        // Limpiar datos del owner y borrar su cuenta
         passwordResetTokenRepository.deleteByUserId(userId);
         saleRepository.nullifyCreatedByUser(userId);
         userRepository.delete(target);
+    }
+
+    private void deleteBusinessAndMembers(UUID businessId, UUID ownerUserId) {
+        // 1. Obtener empleados del negocio (excluyendo al owner que se borra aparte)
+        List<User> employeeUsers = membershipRepository.findByBusinessId(businessId)
+                .stream()
+                .filter(m -> !m.getUser().getId().equals(ownerUserId))
+                .map(BusinessMembership::getUser)
+                .toList();
+
+        // 2. Limpiar datos de cada empleado
+        for (User employee : employeeUsers) {
+            passwordResetTokenRepository.deleteByUserId(employee.getId());
+            saleRepository.nullifyCreatedByUser(employee.getId());
+        }
+
+        // 3. Borrar datos del negocio en orden seguro de FK
+        saleItemRepository.deleteByBusinessId(businessId);
+        saleRepository.deleteByBusinessId(businessId);
+        purchaseOrderItemRepository.deleteByBusinessId(businessId);
+        purchaseOrderRepository.deleteByBusinessId(businessId);
+        goalCategoryTargetRepository.deleteByBusinessId(businessId);
+        goalRepository.deleteByBusinessId(businessId);
+        productRepository.deleteByBusinessId(businessId);
+        categoryRepository.deleteByBusinessId(businessId);
+
+        // 4. Borrar membresías
+        membershipRepository.deleteByBusinessId(businessId);
+
+        // 5. Borrar cuentas de empleados
+        for (User employee : employeeUsers) {
+            userRepository.delete(employee);
+        }
+
+        // 6. Borrar el negocio
+        businessRepository.deleteById(businessId);
     }
 
     @Transactional(readOnly = true)
