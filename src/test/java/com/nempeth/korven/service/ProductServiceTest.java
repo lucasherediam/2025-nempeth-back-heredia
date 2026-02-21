@@ -7,6 +7,7 @@ import com.nempeth.korven.persistence.entity.*;
 import com.nempeth.korven.persistence.repository.*;
 import com.nempeth.korven.rest.dto.ProductResponse;
 import com.nempeth.korven.rest.dto.ProductUpsertRequest;
+import com.nempeth.korven.rest.dto.UpdateStockRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -408,5 +409,121 @@ class ProductServiceTest {
                 // Then
                 assertThat(responses).isEmpty();
                 verify(productRepository).findByBusinessId(businessId);
+        }
+
+        // ==================== UPDATE STOCK TESTS ====================
+
+        @Test
+        @DisplayName("Should update stock successfully")
+        void shouldUpdateStockSuccessfully() {
+                // Given
+                UpdateStockRequest stockRequest = new UpdateStockRequest(
+                                new BigDecimal("200"), StockUnit.KILOGRAMOS, new BigDecimal("30"));
+
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(testMembership));
+                when(productRepository.findByIdAndBusinessId(productId, businessId))
+                                .thenReturn(Optional.of(testProduct));
+                when(productRepository.save(any(Product.class))).thenReturn(testProduct);
+
+                // When
+                productService.updateStock(userEmail, businessId, productId, stockRequest);
+
+                // Then
+                assertThat(testProduct.getStockQuantity()).isEqualByComparingTo(new BigDecimal("200"));
+                assertThat(testProduct.getStockUnit()).isEqualTo(StockUnit.KILOGRAMOS);
+                assertThat(testProduct.getReorderPoint()).isEqualByComparingTo(new BigDecimal("30"));
+                verify(productRepository).save(testProduct);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when updating stock of non-existent product")
+        void shouldThrowExceptionWhenUpdatingStockOfNonExistentProduct() {
+                // Given
+                UpdateStockRequest stockRequest = new UpdateStockRequest(
+                                new BigDecimal("200"), StockUnit.KILOGRAMOS, new BigDecimal("30"));
+
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(testMembership));
+                when(productRepository.findByIdAndBusinessId(productId, businessId))
+                                .thenReturn(Optional.empty());
+
+                // When & Then
+                assertThatThrownBy(() -> productService.updateStock(userEmail, businessId, productId, stockRequest))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("Producto no encontrado en este negocio");
+
+                verify(productRepository, never()).save(any());
+        }
+
+        // ==================== ADDITIONAL BRANCH COVERAGE ====================
+
+        @Test
+        @DisplayName("Should throw exception when updating product with category from different business")
+        void shouldThrowExceptionWhenUpdatingWithCategoryFromDifferentBusiness() {
+                // Given
+                Business differentBusiness = Business.builder()
+                                .id(UUID.randomUUID())
+                                .name("Different Business")
+                                .joinCode("DIFF123")
+                                .build();
+                Category otherCategory = Category.builder()
+                                .id(categoryId)
+                                .business(differentBusiness)
+                                .name("Other Category")
+                                .type(CategoryType.CUSTOM)
+                                .build();
+
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(testMembership));
+                when(productRepository.findByIdAndBusinessId(productId, businessId))
+                                .thenReturn(Optional.of(testProduct));
+                when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(otherCategory));
+
+                // When & Then
+                assertThatThrownBy(() -> productService.update(userEmail, businessId, productId, validRequest))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("La categoría no pertenece a este negocio");
+
+                verify(productRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should throw exception when updating product with non-existent category")
+        void shouldThrowExceptionWhenUpdatingWithNonExistentCategory() {
+                // Given
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(testMembership));
+                when(productRepository.findByIdAndBusinessId(productId, businessId))
+                                .thenReturn(Optional.of(testProduct));
+                when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
+
+                // When & Then
+                assertThatThrownBy(() -> productService.update(userEmail, businessId, productId, validRequest))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("Categoría no encontrada");
+
+                verify(productRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should throw exception when creating product with non-existent business")
+        void shouldThrowExceptionWhenCreatingWithNonExistentBusiness() {
+                // Given
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(testMembership));
+                when(businessRepository.findById(businessId)).thenReturn(Optional.empty());
+
+                // When & Then
+                assertThatThrownBy(() -> productService.create(userEmail, businessId, validRequest))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("Negocio no encontrado");
+
+                verify(productRepository, never()).save(any());
         }
 }

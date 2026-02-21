@@ -852,6 +852,489 @@ class SaleServiceTest {
         assertThat(response.createdByUserName()).isEqualTo("Sistema");
     }
     
+    // ==================== GET SALES BY BUSINESS TESTS ====================
+
+    @Test
+    void getSalesByBusiness_ownerOpenNull_shouldReturnAllSales() {
+        // Given
+        Sale sale = createTestSale(UUID.randomUUID(), new BigDecimal("100.00"));
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdOrderByOccurredAtDesc(businessId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, null);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdOrderByOccurredAtDesc(businessId);
+    }
+
+    @Test
+    void getSalesByBusiness_ownerOpenTrue_shouldReturnOpenSales() {
+        // Given
+        Sale sale = createTestSale(UUID.randomUUID(), BigDecimal.ZERO);
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdAndOccurredAtIsNullOrderByIdDesc(businessId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, true);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdAndOccurredAtIsNullOrderByIdDesc(businessId);
+    }
+
+    @Test
+    void getSalesByBusiness_ownerOpenFalse_shouldReturnClosedSales() {
+        // Given
+        Sale sale = createTestSale(UUID.randomUUID(), new BigDecimal("100.00"));
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdAndOccurredAtIsNotNullOrderByOccurredAtDesc(businessId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, false);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdAndOccurredAtIsNotNullOrderByOccurredAtDesc(businessId);
+    }
+
+    @Test
+    void getSalesByBusiness_employeeOpenNull_shouldReturnOnlyOwnSales() {
+        // Given
+        activeMembership.setRole(MembershipRole.EMPLOYEE);
+        Sale sale = createTestSale(UUID.randomUUID(), new BigDecimal("100.00"));
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdAndCreatedByUserIdOrderByOccurredAtDesc(businessId, userId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, null);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdAndCreatedByUserIdOrderByOccurredAtDesc(businessId, userId);
+    }
+
+    @Test
+    void getSalesByBusiness_employeeOpenTrue_shouldReturnOwnOpenSales() {
+        // Given
+        activeMembership.setRole(MembershipRole.EMPLOYEE);
+        Sale sale = createTestSale(UUID.randomUUID(), BigDecimal.ZERO);
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdAndCreatedByUserIdAndOccurredAtIsNullOrderByIdDesc(businessId, userId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, true);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdAndCreatedByUserIdAndOccurredAtIsNullOrderByIdDesc(businessId, userId);
+    }
+
+    @Test
+    void getSalesByBusiness_employeeOpenFalse_shouldReturnOwnClosedSales() {
+        // Given
+        activeMembership.setRole(MembershipRole.EMPLOYEE);
+        Sale sale = createTestSale(UUID.randomUUID(), new BigDecimal("100.00"));
+        
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findByBusinessIdAndCreatedByUserIdAndOccurredAtIsNotNullOrderByOccurredAtDesc(businessId, userId))
+                .thenReturn(List.of(sale));
+        when(saleItemRepository.findBySaleId(any())).thenReturn(List.of());
+        
+        // When
+        List<SaleResponse> sales = saleService.getSalesByBusiness(userEmail, businessId, false);
+        
+        // Then
+        assertThat(sales).hasSize(1);
+        verify(saleRepository).findByBusinessIdAndCreatedByUserIdAndOccurredAtIsNotNullOrderByOccurredAtDesc(businessId, userId);
+    }
+
+    // ==================== CLOSE SALE TESTS ====================
+
+    @Test
+    void closeSale_shouldSetOccurredAtAndRecalculateTotal() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder()
+                .id(saleId)
+                .business(testBusiness)
+                .createdByUser(testUser)
+                .createdByUserName("John Doe")
+                .occurredAt(null) // Open sale
+                .totalAmount(BigDecimal.ZERO)
+                .build();
+
+        SaleItem item1 = SaleItem.builder()
+                .lineTotal(new BigDecimal("100.00"))
+                .build();
+        SaleItem item2 = SaleItem.builder()
+                .lineTotal(new BigDecimal("200.00"))
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+        when(saleItemRepository.findBySaleId(saleId)).thenReturn(List.of(item1, item2));
+
+        // When
+        saleService.closeSale(userEmail, businessId, saleId);
+
+        // Then
+        assertThat(sale.getOccurredAt()).isNotNull();
+        assertThat(sale.getTotalAmount()).isEqualByComparingTo(new BigDecimal("300.00"));
+        verify(saleRepository).save(sale);
+    }
+
+    @Test
+    void closeSale_shouldThrowException_whenSaleNotFound() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.closeSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Venta no encontrada");
+    }
+
+    @Test
+    void closeSale_shouldThrowException_whenSaleNotInBusiness() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Business otherBusiness = Business.builder().id(UUID.randomUUID()).name("Other").build();
+        Sale sale = Sale.builder().id(saleId).business(otherBusiness).occurredAt(null).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.closeSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("La venta no pertenece a este negocio");
+    }
+
+    @Test
+    void closeSale_shouldThrowException_whenSaleAlreadyClosed() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder()
+                .id(saleId)
+                .business(testBusiness)
+                .occurredAt(OffsetDateTime.now()) // Already closed
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.closeSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("La venta ya está cerrada");
+    }
+
+    // ==================== UPDATE SALE TESTS ====================
+
+    @Test
+    void updateSale_shouldUpdateNoteSuccessfully() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder()
+                .id(saleId)
+                .business(testBusiness)
+                .createdByUser(testUser)
+                .createdByUserName("John Doe")
+                .totalAmount(new BigDecimal("100.00"))
+                .note(null)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+        when(saleRepository.save(any(Sale.class))).thenReturn(sale);
+        when(saleItemRepository.findBySaleId(saleId)).thenReturn(List.of());
+
+        // When
+        SaleResponse result = saleService.updateSale(userEmail, businessId, saleId, "Mesa 5");
+
+        // Then
+        assertThat(sale.getNote()).isEqualTo("Mesa 5");
+        assertThat(result).isNotNull();
+        verify(saleRepository).save(sale);
+    }
+
+    @Test
+    void updateSale_shouldThrowException_whenSaleNotFound() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.updateSale(userEmail, businessId, saleId, "Mesa 5"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Venta no encontrada");
+    }
+
+    @Test
+    void updateSale_shouldThrowException_whenSaleNotInBusiness() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Business otherBusiness = Business.builder().id(UUID.randomUUID()).name("Other").build();
+        Sale sale = Sale.builder().id(saleId).business(otherBusiness).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.updateSale(userEmail, businessId, saleId, "Mesa 5"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("La venta no pertenece a este negocio");
+    }
+
+    // ==================== DELETE SALE TESTS ====================
+
+    @Test
+    void deleteSale_shouldDeleteSuccessfully() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder().id(saleId).business(testBusiness).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When
+        saleService.deleteSale(userEmail, businessId, saleId);
+
+        // Then
+        verify(saleRepository).delete(sale);
+    }
+
+    @Test
+    void deleteSale_shouldThrowException_whenSaleNotFound() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Venta no encontrada");
+    }
+
+    @Test
+    void deleteSale_shouldThrowException_whenSaleNotInBusiness() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Business otherBusiness = Business.builder().id(UUID.randomUUID()).name("Other").build();
+        Sale sale = Sale.builder().id(saleId).business(otherBusiness).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("La venta no pertenece a este negocio");
+    }
+
+    // ==================== VALIDATE ACCESS ERROR PATHS ====================
+
+    @Test
+    void validateUserBusinessAccess_shouldThrowException_whenUserNotFound() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Usuario no encontrado");
+    }
+
+    @Test
+    void validateUserBusinessAccess_shouldThrowException_whenNoAccess() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No tienes acceso a este negocio");
+    }
+
+    @Test
+    void validateUserBusinessAccess_shouldThrowException_whenInactive() {
+        // Given
+        activeMembership.setStatus(MembershipStatus.PENDING);
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, UUID.randomUUID()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Tu membresía en este negocio no está activa");
+    }
+
+    @Test
+    void validateUserBusinessAccessAndGetMembership_shouldThrowException_whenUserNotFound() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.getSalesByBusiness(userEmail, businessId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Usuario no encontrado");
+    }
+
+    @Test
+    void validateUserBusinessAccessAndGetMembership_shouldThrowException_whenNoAccess() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.getSalesByBusiness(userEmail, businessId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No tienes acceso a este negocio");
+    }
+
+    @Test
+    void validateUserBusinessAccessAndGetMembership_shouldThrowException_whenInactive() {
+        // Given
+        activeMembership.setStatus(MembershipStatus.PENDING);
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.getSalesByBusiness(userEmail, businessId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Tu membresía en este negocio no está activa");
+    }
+
+    // ==================== CREATE SALE - ORDER NUMBER WRAPPING ====================
+
+    @Test
+    void createSale_shouldResetOrderNumberTo1_whenMaxIs999() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(businessRepository.findById(businessId)).thenReturn(Optional.of(testBusiness));
+        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.of(999));
+
+        Sale savedSale = Sale.builder()
+                .id(UUID.randomUUID())
+                .business(testBusiness)
+                .createdByUser(testUser)
+                .createdByUserName("John Doe")
+                .orderNumber(1)
+                .totalAmount(BigDecimal.ZERO)
+                .build();
+        when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
+
+        // When
+        saleService.createSale(userEmail, businessId, null);
+
+        // Then
+        ArgumentCaptor<Sale> captor = ArgumentCaptor.forClass(Sale.class);
+        verify(saleRepository).save(captor.capture());
+        assertThat(captor.getValue().getOrderNumber()).isEqualTo(1);
+    }
+
+    @Test
+    void createSale_shouldThrowException_whenBusinessNotFound() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(businessRepository.findById(businessId)).thenReturn(Optional.empty());
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.createSale(userEmail, businessId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Negocio no encontrado");
+    }
+
+    // ==================== MAP TO RESPONSE - EMPTY USERNAME ====================
+
+    @Test
+    void mapToResponse_shouldReturnSistema_whenCreatedByUserNameIsEmpty() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder()
+                .id(saleId)
+                .business(testBusiness)
+                .createdByUser(testUser)
+                .createdByUserName("")
+                .occurredAt(OffsetDateTime.now())
+                .totalAmount(new BigDecimal("100.00"))
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+        when(saleItemRepository.findBySaleId(saleId)).thenReturn(List.of());
+
+        // When
+        SaleResponse response = saleService.getSaleById(userEmail, businessId, saleId);
+
+        // Then
+        assertThat(response.createdByUserName()).isEqualTo("Sistema");
+    }
+
     // ==================== HELPER METHODS ====================
     
     private Sale createTestSale(UUID saleId, BigDecimal totalAmount) {
