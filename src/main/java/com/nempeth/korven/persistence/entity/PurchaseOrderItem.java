@@ -27,6 +27,9 @@ public class PurchaseOrderItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @Column(name = "product_id", insertable = false, updatable = false)
+    private UUID productId;
+
     @Column(name = "product_name", nullable = false)
     private String productName;
 
