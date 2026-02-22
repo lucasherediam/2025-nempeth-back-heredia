@@ -37,6 +37,9 @@ public class PasswordResetService {
         }
         User user = optUser.get();
 
+        // Invalidate any previous reset tokens for this user
+        tokenRepository.deleteByUserId(user.getId());
+
         // Token generation
         byte[] bytes = new byte[32];
         RNG.nextBytes(bytes);
