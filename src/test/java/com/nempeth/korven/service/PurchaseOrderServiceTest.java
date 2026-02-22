@@ -116,6 +116,7 @@ class PurchaseOrderServiceTest {
                                 .id(UUID.randomUUID())
                                 .purchaseOrder(order)
                                 .product(testProduct)
+                                .productId(productId)
                                 .productName("Harina")
                                 .quantity(new BigDecimal("5"))
                                 .unitCost(new BigDecimal("50.00"))
@@ -375,6 +376,7 @@ class PurchaseOrderServiceTest {
                 setupValidAccess();
                 when(purchaseOrderRepository.findByIdAndBusinessId(orderId, businessId))
                                 .thenReturn(Optional.of(order));
+                when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
 
                 // When
                 purchaseOrderService.markAsReceived(userEmail, businessId, orderId);
@@ -397,6 +399,7 @@ class PurchaseOrderServiceTest {
                 setupValidAccess();
                 when(purchaseOrderRepository.findByIdAndBusinessId(orderId, businessId))
                                 .thenReturn(Optional.of(order));
+                when(productRepository.findById(productId)).thenReturn(Optional.of(testProduct));
 
                 // When
                 purchaseOrderService.markAsReceived(userEmail, businessId, orderId);

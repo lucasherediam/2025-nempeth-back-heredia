@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+           http://www.liquibase.org/xml/ns/dbchangelog
+           http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.23.xsd">
+
+    <changeSet id="2.3-remove-fk-purchase-order-item-product" author="korven">
+        <comment>Remove foreign key constraint from purchase_order_items to products to allow product deletion</comment>
+        <dropForeignKeyConstraint baseTableName="purchase_order_items" constraintName="fk_purchase_order_item_product"/>
+    </changeSet>
+
+</databaseChangeLog>

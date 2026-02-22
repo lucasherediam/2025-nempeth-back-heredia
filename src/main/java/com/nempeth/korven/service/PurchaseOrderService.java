@@ -119,9 +119,8 @@ public class PurchaseOrderService {
                 // Update product stock
                 int skippedItems = 0;
                 for (PurchaseOrderItem item : order.getItems()) {
-                        Product product = item.getProduct();
+                        Product product = productRepository.findById(item.getProductId()).orElse(null);
 
-                        // Defensive check: product might have been deleted
                         if (product == null) {
                                 skippedItems++;
                                 continue;
