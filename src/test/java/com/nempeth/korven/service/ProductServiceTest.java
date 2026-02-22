@@ -1,6 +1,7 @@
 package com.nempeth.korven.service;
 
 import com.nempeth.korven.constants.CategoryType;
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.constants.StockUnit;
 import com.nempeth.korven.persistence.entity.*;
@@ -107,6 +108,7 @@ class ProductServiceTest {
                 testMembership = BusinessMembership.builder()
                                 .user(testUser)
                                 .business(testBusiness)
+                                .role(MembershipRole.OWNER)
                                 .status(MembershipStatus.ACTIVE)
                                 .build();
 
@@ -523,6 +525,29 @@ class ProductServiceTest {
                 assertThatThrownBy(() -> productService.create(userEmail, businessId, validRequest))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("Negocio no encontrado");
+
+                verify(productRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should throw exception when employee tries to create product")
+        void shouldThrowExceptionWhenEmployeeTriesToCreateProduct() {
+                // Given
+                BusinessMembership employeeMembership = BusinessMembership.builder()
+                                .user(testUser)
+                                .business(testBusiness)
+                                .role(MembershipRole.EMPLOYEE)
+                                .status(MembershipStatus.ACTIVE)
+                                .build();
+
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(employeeMembership));
+
+                // When & Then
+                assertThatThrownBy(() -> productService.create(userEmail, businessId, validRequest))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("Solo el dueño del negocio puede realizar esta acción");
 
                 verify(productRepository, never()).save(any());
         }

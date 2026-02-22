@@ -37,17 +37,11 @@ public class SaleService {
             userName = user.getEmail();
         }
 
-        // Calcular número de orden cíclico (1-999)
-        int nextOrderNumber = saleRepository.findMaxOrderNumberByBusinessId(businessId)
-                .map(max -> max >= 999 ? 1 : max + 1)
-                .orElse(1);
-
         // Crear la venta vacía
         Sale sale = Sale.builder()
                 .business(business)
                 .createdByUser(user)
                 .createdByUserName(userName)
-                .orderNumber(nextOrderNumber)
                 .note(note)
                 .occurredAt(null)
                 .totalAmount(BigDecimal.ZERO)
@@ -124,13 +118,18 @@ public class SaleService {
 
     @Transactional
     public void closeSale(String userEmail, UUID businessId, UUID saleId) {
-        validateUserBusinessAccess(userEmail, businessId);
+        BusinessMembership membership = validateUserBusinessAccessAndGetMembership(userEmail, businessId);
         
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
         
         if (!sale.getBusiness().getId().equals(businessId)) {
             throw new IllegalArgumentException("La venta no pertenece a este negocio");
+        }
+
+        if (membership.getRole() == MembershipRole.EMPLOYEE
+                && !sale.getCreatedByUser().getId().equals(membership.getUser().getId())) {
+            throw new IllegalArgumentException("No tienes permisos para cerrar esta venta");
         }
         
         if (sale.getOccurredAt() != null) {
@@ -150,7 +149,7 @@ public class SaleService {
 
     @Transactional
     public void deleteSale(String userEmail, UUID businessId, UUID saleId) {
-        validateUserBusinessAccess(userEmail, businessId);
+        BusinessMembership membership = validateUserBusinessAccessAndGetMembership(userEmail, businessId);
 
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
@@ -159,18 +158,32 @@ public class SaleService {
             throw new IllegalArgumentException("La venta no pertenece a este negocio");
         }
 
+        if (sale.getOccurredAt() != null) {
+            throw new IllegalArgumentException("No se puede eliminar una venta cerrada");
+        }
+
+        if (membership.getRole() == MembershipRole.EMPLOYEE
+                && !sale.getCreatedByUser().getId().equals(membership.getUser().getId())) {
+            throw new IllegalArgumentException("No tienes permisos para eliminar esta venta");
+        }
+
         saleRepository.delete(sale);
     }
 
     @Transactional
     public SaleResponse updateSale(String userEmail, UUID businessId, UUID saleId, String note) {
-        validateUserBusinessAccess(userEmail, businessId);
+        BusinessMembership membership = validateUserBusinessAccessAndGetMembership(userEmail, businessId);
 
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new IllegalArgumentException("Venta no encontrada"));
 
         if (!sale.getBusiness().getId().equals(businessId)) {
             throw new IllegalArgumentException("La venta no pertenece a este negocio");
+        }
+
+        if (membership.getRole() == MembershipRole.EMPLOYEE
+                && !sale.getCreatedByUser().getId().equals(membership.getUser().getId())) {
+            throw new IllegalArgumentException("No tienes permisos para modificar esta venta");
         }
 
         sale.setNote(note);
@@ -227,7 +240,6 @@ public class SaleService {
 
         return SaleResponse.builder()
                 .id(sale.getId())
-                .orderNumber(sale.getOrderNumber())
                 .note(sale.getNote())
                 .occurredAt(sale.getOccurredAt())
                 .totalAmount(sale.getTotalAmount())

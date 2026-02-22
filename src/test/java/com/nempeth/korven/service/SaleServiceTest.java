@@ -118,7 +118,6 @@ class SaleServiceTest {
                 .totalAmount(BigDecimal.ZERO)
                 .build();
         
-        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.empty());
         when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
         
         // When
@@ -162,7 +161,6 @@ class SaleServiceTest {
                 .totalAmount(BigDecimal.ZERO)
                 .build();
         
-        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.empty());
         when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
         
         // When
@@ -1138,7 +1136,7 @@ class SaleServiceTest {
     void deleteSale_shouldDeleteSuccessfully() {
         // Given
         UUID saleId = UUID.randomUUID();
-        Sale sale = Sale.builder().id(saleId).business(testBusiness).build();
+        Sale sale = Sale.builder().id(saleId).business(testBusiness).createdByUser(testUser).occurredAt(null).build();
 
         when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
         when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
@@ -1150,6 +1148,49 @@ class SaleServiceTest {
 
         // Then
         verify(saleRepository).delete(sale);
+    }
+
+    @Test
+    void deleteSale_shouldThrowException_whenSaleIsClosed() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        Sale sale = Sale.builder().id(saleId).business(testBusiness).createdByUser(testUser).occurredAt(OffsetDateTime.now()).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(activeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No se puede eliminar una venta cerrada");
+
+        verify(saleRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteSale_shouldThrowException_whenEmployeeDeletesOthersSale() {
+        // Given
+        UUID saleId = UUID.randomUUID();
+        User otherUser = User.builder().id(UUID.randomUUID()).email("other@example.com").build();
+        Sale sale = Sale.builder().id(saleId).business(testBusiness).createdByUser(otherUser).occurredAt(null).build();
+
+        BusinessMembership employeeMembership = BusinessMembership.builder()
+                .user(testUser).business(testBusiness)
+                .role(MembershipRole.EMPLOYEE).status(MembershipStatus.ACTIVE).build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(employeeMembership));
+        when(saleRepository.findById(saleId)).thenReturn(Optional.of(sale));
+
+        // When/Then
+        assertThatThrownBy(() -> saleService.deleteSale(userEmail, businessId, saleId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No tienes permisos para eliminar esta venta");
+
+        verify(saleRepository, never()).delete(any());
     }
 
     @Test
@@ -1263,35 +1304,7 @@ class SaleServiceTest {
                 .hasMessageContaining("Tu membresía en este negocio no está activa");
     }
 
-    // ==================== CREATE SALE - ORDER NUMBER WRAPPING ====================
-
-    @Test
-    void createSale_shouldResetOrderNumberTo1_whenMaxIs999() {
-        // Given
-        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
-        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
-                .thenReturn(Optional.of(activeMembership));
-        when(businessRepository.findById(businessId)).thenReturn(Optional.of(testBusiness));
-        when(saleRepository.findMaxOrderNumberByBusinessId(businessId)).thenReturn(Optional.of(999));
-
-        Sale savedSale = Sale.builder()
-                .id(UUID.randomUUID())
-                .business(testBusiness)
-                .createdByUser(testUser)
-                .createdByUserName("John Doe")
-                .orderNumber(1)
-                .totalAmount(BigDecimal.ZERO)
-                .build();
-        when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
-
-        // When
-        saleService.createSale(userEmail, businessId, null);
-
-        // Then
-        ArgumentCaptor<Sale> captor = ArgumentCaptor.forClass(Sale.class);
-        verify(saleRepository).save(captor.capture());
-        assertThat(captor.getValue().getOrderNumber()).isEqualTo(1);
-    }
+    // ==================== CREATE SALE - BUSINESS NOT FOUND ====================
 
     @Test
     void createSale_shouldThrowException_whenBusinessNotFound() {

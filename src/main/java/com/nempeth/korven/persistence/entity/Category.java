@@ -37,7 +37,7 @@ public class Category {
     @Column(name = "icon", columnDefinition = "text")
     private String icon;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
     private Set<Product> products;
 
     @PrePersist

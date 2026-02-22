@@ -1,5 +1,6 @@
 package com.nempeth.korven.service;
 
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.persistence.entity.Business;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
@@ -34,7 +35,7 @@ public class ProductService {
 
     @Transactional
     public UUID create(String userEmail, UUID businessId, ProductUpsertRequest req) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateOwnerAccess(userEmail, businessId);
 
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
@@ -86,7 +87,7 @@ public class ProductService {
 
     @Transactional
     public void update(String userEmail, UUID businessId, UUID productId, ProductUpsertRequest req) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateOwnerAccess(userEmail, businessId);
 
         Product product = productRepository.findByIdAndBusinessId(productId, businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
@@ -112,7 +113,7 @@ public class ProductService {
 
     @Transactional
     public void updateStock(String userEmail, UUID businessId, UUID productId, UpdateStockRequest req) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateOwnerAccess(userEmail, businessId);
 
         Product product = productRepository.findByIdAndBusinessId(productId, businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
@@ -126,7 +127,7 @@ public class ProductService {
 
     @Transactional
     public void delete(String userEmail, UUID businessId, UUID productId) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateOwnerAccess(userEmail, businessId);
 
         Product product = productRepository.findByIdAndBusinessId(productId, businessId)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado en este negocio"));
@@ -143,6 +144,22 @@ public class ProductService {
 
         if (membership.getStatus() != MembershipStatus.ACTIVE) {
             throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+        }
+    }
+
+    private void validateOwnerAccess(String userEmail, UUID businessId) {
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        BusinessMembership membership = membershipRepository.findByBusinessIdAndUserId(businessId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No tienes acceso a este negocio"));
+
+        if (membership.getStatus() != MembershipStatus.ACTIVE) {
+            throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+        }
+
+        if (membership.getRole() != MembershipRole.OWNER) {
+            throw new IllegalArgumentException("Solo el dueño del negocio puede realizar esta acción");
         }
     }
 

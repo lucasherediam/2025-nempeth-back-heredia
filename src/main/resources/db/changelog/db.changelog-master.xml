@@ -18,4 +18,5 @@
   <include file="db/changelog/db.changelog-2.1-purchase-orders.xml"/>
   <include file="db/changelog/db.changelog-2.2-sale-order-number-note.xml"/>
   <include file="db/changelog/db.changelog-2.3-remove-fk-purchase-order-item-product.xml"/>
+  <include file="db/changelog/db.changelog-2.4-drop-sale-order-number.xml"/>
 </databaseChangeLog>

@@ -11,6 +11,7 @@ import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
 import com.nempeth.korven.persistence.repository.BusinessRepository;
 import com.nempeth.korven.persistence.repository.CategoryRepository;
 import com.nempeth.korven.persistence.repository.GoalCategoryTargetRepository;
+import com.nempeth.korven.persistence.repository.ProductRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.CategoryResponse;
 import com.nempeth.korven.rest.dto.CreateCategoryRequest;
@@ -31,10 +32,11 @@ public class CategoryService {
     private final BusinessMembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final GoalCategoryTargetRepository goalCategoryTargetRepository;
+    private final ProductRepository productRepository;
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> getCategoriesByBusiness(String userEmail, UUID businessId) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateMemberAccess(userEmail, businessId);
         
         return categoryRepository.findByBusinessId(businessId).stream()
                 .map(this::mapToResponse)
@@ -43,7 +45,7 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public List<CategoryResponse> getCustomCategoriesByBusiness(String userEmail, UUID businessId) {
-        validateUserBusinessAccess(userEmail, businessId);
+        validateMemberAccess(userEmail, businessId);
         
         return categoryRepository.findByBusinessIdAndType(businessId, CategoryType.CUSTOM).stream()
                 .map(this::mapToResponse)
@@ -87,6 +89,10 @@ public class CategoryService {
         
         if (category.getType() == CategoryType.STATIC) {
             throw new IllegalArgumentException("No se puede eliminar una categoría estática");
+        }
+
+        if (productRepository.existsByCategoryId(categoryId)) {
+            throw new IllegalArgumentException("No se puede eliminar una categoría que tiene productos asociados");
         }
         
         categoryRepository.delete(category);
@@ -135,6 +141,18 @@ public class CategoryService {
         return mapToResponse(category);
     }
 
+    private void validateMemberAccess(String userEmail, UUID businessId) {
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        
+        BusinessMembership membership = membershipRepository.findByBusinessIdAndUserId(businessId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("No tienes acceso a este negocio"));
+        
+        if (membership.getStatus() != MembershipStatus.ACTIVE) {
+            throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+        }
+    }
+
     private void validateUserBusinessAccess(String userEmail, UUID businessId) {
         User user = userRepository.findByEmailIgnoreCase(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
@@ -144,6 +162,10 @@ public class CategoryService {
         
         if (membership.getStatus() != MembershipStatus.ACTIVE) {
             throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+        }
+
+        if (membership.getRole() != MembershipRole.OWNER) {
+            throw new IllegalArgumentException("Solo el dueño del negocio puede realizar esta acción");
         }
     }
 

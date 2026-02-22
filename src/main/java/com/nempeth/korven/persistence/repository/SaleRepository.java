@@ -18,9 +18,6 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
     @Query("UPDATE Sale s SET s.createdByUser = null WHERE s.createdByUser.id = :userId")
     void nullifyCreatedByUser(@Param("userId") UUID userId);
 
-    @Query("SELECT MAX(s.orderNumber) FROM Sale s WHERE s.business.id = :businessId")
-    Optional<Integer> findMaxOrderNumberByBusinessId(@Param("businessId") UUID businessId);
-
     List<Sale> findByBusinessIdOrderByOccurredAtDesc(UUID businessId);
 
     void deleteByBusinessId(UUID businessId);
