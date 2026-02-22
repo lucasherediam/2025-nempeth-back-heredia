@@ -1,5 +1,6 @@
 package com.nempeth.korven.service;
 
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.constants.PurchaseOrderStatus;
 import com.nempeth.korven.persistence.entity.*;
@@ -90,6 +91,7 @@ class PurchaseOrderServiceTest {
                 testMembership = BusinessMembership.builder()
                                 .user(testUser)
                                 .business(testBusiness)
+                                .role(MembershipRole.OWNER)
                                 .status(MembershipStatus.ACTIVE)
                                 .build();
         }
@@ -572,5 +574,28 @@ class PurchaseOrderServiceTest {
                 assertThatThrownBy(() -> purchaseOrderService.list(userEmail, businessId))
                                 .isInstanceOf(IllegalArgumentException.class)
                                 .hasMessageContaining("Tu membresía en este negocio no está activa");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when employee tries to create purchase order")
+        void shouldThrowExceptionWhenEmployeeTriesToCreatePurchaseOrder() {
+                // Given
+                BusinessMembership employeeMembership = BusinessMembership.builder()
+                                .user(testUser)
+                                .business(testBusiness)
+                                .role(MembershipRole.EMPLOYEE)
+                                .status(MembershipStatus.ACTIVE)
+                                .build();
+
+                when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+                when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                                .thenReturn(Optional.of(employeeMembership));
+
+                CreatePurchaseOrderRequest req = new CreatePurchaseOrderRequest("Proveedor", List.of());
+
+                // When & Then
+                assertThatThrownBy(() -> purchaseOrderService.create(userEmail, businessId, req))
+                                .isInstanceOf(IllegalArgumentException.class)
+                                .hasMessageContaining("Solo el dueño del negocio puede realizar esta acción");
         }
 }

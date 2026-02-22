@@ -10,7 +10,6 @@ import java.util.UUID;
 @Builder
 public record SaleResponse(
         UUID id,
-        Integer orderNumber,
         String note,
         OffsetDateTime occurredAt,
         BigDecimal totalAmount,

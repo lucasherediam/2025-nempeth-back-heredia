@@ -52,7 +52,6 @@ class SaleControllerTest {
         private SaleResponse createSaleResponse() {
                 return SaleResponse.builder()
                                 .id(saleId)
-                                .orderNumber(1)
                                 .note("Mesa 5")
                                 .occurredAt(OffsetDateTime.now())
                                 .totalAmount(new BigDecimal("250.00"))

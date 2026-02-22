@@ -18,4 +18,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     Optional<Product> findByIdAndBusinessId(UUID id, UUID businessId);
 
     boolean existsByBusinessIdAndNameIgnoreCase(UUID businessId, String name);
+
+    boolean existsByCategoryId(UUID categoryId);
 }

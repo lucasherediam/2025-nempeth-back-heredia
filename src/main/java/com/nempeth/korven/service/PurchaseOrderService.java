@@ -1,5 +1,6 @@
 package com.nempeth.korven.service;
 
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.constants.PurchaseOrderStatus;
 import com.nempeth.korven.persistence.entity.*;
@@ -63,7 +64,7 @@ public class PurchaseOrderService {
 
         @Transactional(readOnly = true)
         public List<PurchaseOrderListItem> list(String userEmail, UUID businessId) {
-                validateUserBusinessAccess(userEmail, businessId);
+                validateMemberAccess(userEmail, businessId);
 
                 List<PurchaseOrder> orders = purchaseOrderRepository.findByBusinessId(businessId);
 
@@ -74,7 +75,7 @@ public class PurchaseOrderService {
 
         @Transactional(readOnly = true)
         public PurchaseOrderResponse getById(String userEmail, UUID businessId, UUID purchaseOrderId) {
-                validateUserBusinessAccess(userEmail, businessId);
+                validateMemberAccess(userEmail, businessId);
 
                 PurchaseOrder order = purchaseOrderRepository.findByIdAndBusinessId(purchaseOrderId, businessId)
                                 .orElseThrow(() -> new IllegalArgumentException("Orden de compra no encontrada"));
@@ -156,6 +157,18 @@ public class PurchaseOrderService {
                 purchaseOrderRepository.save(order);
         }
 
+        private void validateMemberAccess(String userEmail, UUID businessId) {
+                User user = userRepository.findByEmailIgnoreCase(userEmail)
+                                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+                BusinessMembership membership = membershipRepository.findByBusinessIdAndUserId(businessId, user.getId())
+                                .orElseThrow(() -> new IllegalArgumentException("No tienes acceso a este negocio"));
+
+                if (membership.getStatus() != MembershipStatus.ACTIVE) {
+                        throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+                }
+        }
+
         private void validateUserBusinessAccess(String userEmail, UUID businessId) {
                 User user = userRepository.findByEmailIgnoreCase(userEmail)
                                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
@@ -165,6 +178,10 @@ public class PurchaseOrderService {
 
                 if (membership.getStatus() != MembershipStatus.ACTIVE) {
                         throw new IllegalArgumentException("Tu membresía en este negocio no está activa");
+                }
+
+                if (membership.getRole() != MembershipRole.OWNER) {
+                        throw new IllegalArgumentException("Solo el dueño del negocio puede realizar esta acción");
                 }
         }
 

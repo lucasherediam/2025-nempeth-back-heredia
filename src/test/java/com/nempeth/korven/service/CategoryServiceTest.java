@@ -1,6 +1,7 @@
 package com.nempeth.korven.service;
 
 import com.nempeth.korven.constants.CategoryType;
+import com.nempeth.korven.constants.MembershipRole;
 import com.nempeth.korven.constants.MembershipStatus;
 import com.nempeth.korven.persistence.entity.Business;
 import com.nempeth.korven.persistence.entity.BusinessMembership;
@@ -10,6 +11,7 @@ import com.nempeth.korven.persistence.repository.BusinessMembershipRepository;
 import com.nempeth.korven.persistence.repository.BusinessRepository;
 import com.nempeth.korven.persistence.repository.CategoryRepository;
 import com.nempeth.korven.persistence.repository.GoalCategoryTargetRepository;
+import com.nempeth.korven.persistence.repository.ProductRepository;
 import com.nempeth.korven.persistence.repository.UserRepository;
 import com.nempeth.korven.rest.dto.CategoryResponse;
 import com.nempeth.korven.rest.dto.CreateCategoryRequest;
@@ -49,6 +51,9 @@ class CategoryServiceTest {
 
     @Mock
     private GoalCategoryTargetRepository goalCategoryTargetRepository;
+
+    @Mock
+    private ProductRepository productRepository;
 
     @InjectMocks
     private CategoryService categoryService;
@@ -105,6 +110,7 @@ class CategoryServiceTest {
         testMembership = BusinessMembership.builder()
                 .user(testUser)
                 .business(testBusiness)
+                .role(MembershipRole.OWNER)
                 .status(MembershipStatus.ACTIVE)
                 .build();
     }
@@ -222,10 +228,27 @@ class CategoryServiceTest {
         when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
                 .thenReturn(Optional.of(testMembership));
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(customCategory));
+        when(productRepository.existsByCategoryId(categoryId)).thenReturn(false);
 
         categoryService.deleteCustomCategory(userEmail, businessId, categoryId);
 
         verify(categoryRepository).delete(customCategory);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when deleting category with associated products")
+    void shouldThrowExceptionWhenDeletingCategoryWithProducts() {
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(testMembership));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(customCategory));
+        when(productRepository.existsByCategoryId(categoryId)).thenReturn(true);
+
+        assertThatThrownBy(() -> categoryService.deleteCustomCategory(userEmail, businessId, categoryId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No se puede eliminar una categoría que tiene productos asociados");
+
+        verify(categoryRepository, never()).delete(any());
     }
 
     @Test
@@ -411,5 +434,28 @@ class CategoryServiceTest {
         List<CategoryResponse> responses = categoryService.getCategoriesByBusiness(userEmail, businessId);
 
         assertThat(responses).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should throw exception when employee tries to create category")
+    void shouldThrowExceptionWhenEmployeeTriesToCreateCategory() {
+        BusinessMembership employeeMembership = BusinessMembership.builder()
+                .user(testUser)
+                .business(testBusiness)
+                .role(MembershipRole.EMPLOYEE)
+                .status(MembershipStatus.ACTIVE)
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase(userEmail)).thenReturn(Optional.of(testUser));
+        when(membershipRepository.findByBusinessIdAndUserId(businessId, userId))
+                .thenReturn(Optional.of(employeeMembership));
+
+        CreateCategoryRequest request = new CreateCategoryRequest("Test", "Test", "🔧");
+
+        assertThatThrownBy(() -> categoryService.createCustomCategory(userEmail, businessId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Solo el dueño del negocio puede realizar esta acción");
+
+        verify(categoryRepository, never()).save(any());
     }
 }
