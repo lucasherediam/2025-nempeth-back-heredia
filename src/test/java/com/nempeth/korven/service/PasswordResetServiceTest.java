@@ -89,6 +89,7 @@ class PasswordResetServiceTest {
 
         // Then
         verify(userRepository).findByEmailIgnoreCase(TEST_EMAIL);
+        verify(tokenRepository).deleteByUserId(testUser.getId());
         verify(tokenRepository).save(any(PasswordResetToken.class));
         verify(emailService).sendPasswordResetEmail(eq(TEST_EMAIL), anyString());
     }
@@ -244,6 +245,22 @@ class PasswordResetServiceTest {
         String token2 = tokenCaptor.getAllValues().get(1).getToken();
         
         assertThat(token1).isNotEqualTo(token2);
+    }
+
+    @Test
+    @DisplayName("Should invalidate previous tokens before creating new one")
+    void shouldInvalidatePreviousTokensBeforeCreatingNewOne() {
+        // Given
+        when(userRepository.findByEmailIgnoreCase(TEST_EMAIL)).thenReturn(Optional.of(testUser));
+        when(tokenRepository.save(any(PasswordResetToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        passwordResetService.startReset(TEST_EMAIL, request);
+
+        // Then — deleteByUserId must be called before save
+        var inOrder = inOrder(tokenRepository);
+        inOrder.verify(tokenRepository).deleteByUserId(testUser.getId());
+        inOrder.verify(tokenRepository).save(any(PasswordResetToken.class));
     }
 
     // ==================== VALIDATE TOKEN TESTS ====================

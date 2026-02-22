@@ -3,6 +3,7 @@ package com.nempeth.korven.rest;
 import com.nempeth.korven.rest.dto.*;
 import com.nempeth.korven.service.AuthService;
 import com.nempeth.korven.service.PasswordResetService;
+import com.nempeth.korven.service.RateLimiterService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +30,9 @@ class AuthControllerTest {
 
         @Mock
         private PasswordResetService passwordResetService;
+
+        @Mock
+        private RateLimiterService rateLimiterService;
 
         @Mock
         private HttpServletRequest httpServletRequest;
@@ -124,7 +128,7 @@ class AuthControllerTest {
                 when(authService.loginAndIssueToken(request)).thenReturn("jwt-token-123");
 
                 // When
-                ResponseEntity<?> response = authController.login(request);
+                ResponseEntity<?> response = authController.login(request, httpServletRequest);
 
                 // Then
                 assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -190,9 +194,10 @@ class AuthControllerTest {
                 // Given
                 ResetPasswordRequest request = new ResetPasswordRequest("valid-token", "newPass456");
                 doNothing().when(passwordResetService).resetPassword("valid-token", "newPass456");
+                when(httpServletRequest.getRemoteAddr()).thenReturn("127.0.0.1");
 
                 // When
-                ResponseEntity<Void> response = authController.reset(request);
+                ResponseEntity<Void> response = authController.reset(request, httpServletRequest);
 
                 // Then
                 assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
